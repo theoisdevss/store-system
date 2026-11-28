@@ -137,7 +137,8 @@ jobs:
           assert.ok(!dashboard.includes('GHTOK'));
           assert.ok(!dashboard.includes('api.github.com/repos/githup29333/store-system/actions/workflows/send.yml/dispatches'));
           assert.ok(dashboard.includes("ownerAction('dispatch_status')"));
-          assert.ok(dashboard.includes("ownerAction('set_dispatch_token'"));
+          assert.ok(dashboard.includes("ghRun('verify')"));
+          assert.ok(!dashboard.includes('id="gtok"') && !dashboard.includes('id="gsave"'), 'Dashboard must not expose manual GitHub token entry');
           assert.ok(worker.includes('const escHtml='));
           assert.ok(worker.includes('escHtml(x.c.n)'));
           assert.ok(worker.includes('escHtml(c.n)'));
@@ -147,6 +148,8 @@ jobs:
           assert.ok(receipt.includes('receipt_get') && receipt.includes('receipt_confirm'));
           assert.ok(receipt.includes('data-review') && receipt.includes('recipientName'));
           assert.ok(workerEdge.includes('hotel_receipt_issue') && workerEdge.includes('receipt_get') && workerEdge.includes('receipt_confirm'));
+          assert.ok(workerEdge.includes('!/^[0-9]+$/.test(p[0])'), 'Receipt parser must validate numeric item IDs correctly');
+          assert.ok(edge.includes('["auto", "verify"].includes(mode)'), 'Dispatch must allow automatic and SMTP verify modes only');
           assert.ok(migrations.includes('orders_receipt_token_hash_uidx') && migrations.includes('received_by'));
           assert.ok(worker.includes('rq<=0||is<0||is>rq'));
           assert.ok(worker.includes('iss>req'));
