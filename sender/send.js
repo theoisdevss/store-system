@@ -133,7 +133,7 @@ async function sendOne(d,to,cc,hotelName){
 }
 
 
-async function sendBatch(group, to, cc, hotelName, ctx, allowUnsigned=false){
+async function sendBatch(group, to, cc, hotelName, ctx){
  const hotelCode=group[0]?.hotel;
  const receiptRows=await rest('receipt_confirmations?select=hotel_code,order_no,department,recipient_name,confirmed_at,items,signature_png&hotel_code=eq.'+enc(hotelCode)+'&order=confirmed_at.desc&limit=5000');
  const receiptMap=new Map();
@@ -141,10 +141,9 @@ async function sendBatch(group, to, cc, hotelName, ctx, allowUnsigned=false){
   if(r.signature_png&&Array.isArray(r.items)&&!receiptMap.has(String(r.order_no)))receiptMap.set(String(r.order_no),r);
  }
  const waiting=group.filter(d=>!receiptMap.has(String(d.no)));
- if(waiting.length&&!allowUnsigned)console.log('Waiting for recipient signature; approved orders remain unsent: '+waiting.map(d=>d.no).join(', '));
- if(waiting.length&&allowUnsigned)console.warn('MANUAL OVERRIDE: sending without recipient signature: '+waiting.map(d=>d.no).join(', '));
- if(!allowUnsigned)group=group.filter(d=>receiptMap.has(String(d.no)));
- if(!group.length){console.log('No eligible orders to send for '+hotelCode);return true;}
+ if(waiting.length)console.log('Waiting for recipient signature; approved orders remain unsent: '+waiting.map(d=>d.no).join(', '));
+ group=group.filter(d=>receiptMap.has(String(d.no)));
+ if(!group.length){console.log('No signed receipts available for '+hotelCode+'; nothing sent');return true;}
  const claimed=[];
  for(const d of group){
   const got=await rest('deliveries?key=eq.'+enc(d.key)+'&rev=eq.'+d.rev+'&status=eq.approved',{
@@ -157,7 +156,7 @@ async function sendBatch(group, to, cc, hotelName, ctx, allowUnsigned=false){
  try{
   if(!to.length)throw new Error('لا يوجد مستلم لهذا الفندق / no To recipient');
   const files=await require('./batch-workbooks').generateBatchWorkbooks(claimed,ctx);
-  const receiptWorkbook=await require('./batch-workbooks').generateReceiptWorkbook(claimed,ctx,receiptMap,{allowUnsigned});
+  const receiptWorkbook=await require('./batch-workbooks').generateReceiptWorkbook(claimed,ctx,receiptMap);
   for(const [name,buf] of [['Issue_Departments.xlsx',files.issue],['Cost_Departments.xlsx',files.cost],['Receipt_Confirmations.xlsx',receiptWorkbook]]){
    if(!buf||buf.length<100||buf.subarray(0,2).toString()!=='PK')throw new Error('ملف Excel المجمّع غير صالح: '+name);
   }
@@ -243,6 +242,7 @@ async function main(){
    const tz=cfg.timezone||'Africa/Tripoli',now=localParts(new Date(),tz);
    if(!atOrAfter(now,cfg.time||'15:00')){
     console.log('Waiting for configured local time '+(cfg.time||'15:00')+' '+tz);
+    return;
    }else{
     const created=cfg.enabled_at||'1970-01-01T00:00:00.000Z';
     const pending=await rest('deliveries?select=*&status=eq.pending&dept=neq.ALL&created_at=gte.'+enc(created)+'&order=created_at.asc&limit='+LIMIT);
@@ -277,7 +277,7 @@ async function main(){
  const grouped=new Map();
  for(const d of rows){if(!grouped.has(d.hotel))grouped.set(d.hotel,[]);grouped.get(d.hotel).push(d);}
  let ok=true;
- for(const [hotel,orders] of grouped){const g=by(hotel);ok=(await sendBatch(orders,g.to,g.cc,hname[hotel]||'',ctx,mode==='manual'))&&ok;}
+ for(const [hotel,orders] of grouped){const g=by(hotel);ok=(await sendBatch(orders,g.to,g.cc,hname[hotel]||'',ctx))&&ok;}
  if(!ok)process.exitCode=1;
 }
 main().catch(e=>{console.error('Fatal: '+(e.message||e));process.exit(1);});
