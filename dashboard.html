@@ -598,7 +598,7 @@ async function ownerAction(action,mode,token){
  if(r.status===401&&S&&S.r){await auth({refresh_token:S.r},'refresh_token');return ownerAction(action,mode,token)}
  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||('HTTP '+r.status));return j;
 }
-async function ghRun(mode='send'){
+async function ghRun(mode='auto'){
  try{const j=await ownerAction('dispatch',mode);return j.ok?'ok':(j.error||'dispatch-failed')}
  catch(e){return e.message||'dispatch-failed'}
 }
@@ -666,7 +666,7 @@ async function bulkMerge(){
   await upload(path,buf);
   await api('deliveries',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({key,hotel:hs[0],dept:'ALL',no,ds,dn:'ملف مجمّع / Combined',code:'BATCH|'+L.map(d=>d.no).join(','),status:'approved',rev:1,file_path:path,approved_at:iso,updated_at:iso})});
   for(const d of L)await api('deliveries?key=eq.'+enc(d.key)+'&rev=eq.'+d.rev,{method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({status:'merged',error:'ضُمّ في '+no,updated_at:iso})});
-  DSEL.clear();await load();alert('تم دمج '+L.length+' طلب في ملف واحد ('+no+'). '+GHMSG(await ghRun()));
+  DSEL.clear();await load();alert('تم دمج '+L.length+' طلب في ملف واحد ('+no+').');
  }catch(e){alert('تعذّر الدمج: '+e.message)}
 }
 $('#d').onclick=async e=>{
