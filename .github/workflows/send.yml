@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'auto = إرسال تلقائي بعد الموعد وتوقيع المستلم | test = اختبار اتصال البريد والمرفقات'
+        description: 'auto = إرسال تلقائي بعد الموعد وتوقيع المستلم | verify = فحص اتصال SMTP دون إرسال'
         type: choice
         options:
           - auto
@@ -39,5 +39,3 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_INSECURE: ${{ secrets.SMTP_INSECURE }}
-          TEST_TO: ${{ secrets.TEST_TO || 'store@ebreazehotel.com' }}
-          TEST_HOTEL: EBR
