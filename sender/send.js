@@ -1,5 +1,5 @@
 // Sends one completed issue per email with two validated Excel attachments.
-// Scheduled runs use Africa/Tripoli time; manual dispatch remains available.
+// Automatic runs use Africa/Tripoli time and require a named, signed receipt.
 const nodemailer = require('nodemailer');
 const { generateWorkbooks } = require('./workbooks');
 const { localParts, atOrAfter, signedOnly } = require('./automation');
