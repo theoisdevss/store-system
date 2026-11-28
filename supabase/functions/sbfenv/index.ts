@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 const cors = {
-  "Access-Control-Allow-Origin": "https://githup29333.github.io",
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
@@ -17,14 +17,15 @@ const respond = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: cors });
 const modules = ["orders", "items", "inventory", "prices", "hotels", "deliveries", "reports", "settings", "audit"];
 
-function cleanPermissions(value: unknown) {
+function cleanPermissions(value: unknown, protectOwner = false) {
   const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
   const out: Record<string, Record<string, boolean>> = {};
   for (const key of modules) {
     const v = input[key] && typeof input[key] === "object" ? input[key] as Record<string, unknown> : {};
     out[key] = {};
     for (const action of ["read", "create", "update", "delete"]) out[key][action] = v[action] === true;
-    if (key === "inventory") out[key].thresholds = v.thresholds === true;
+    if (key === "inventory") { out[key].thresholds = v.thresholds === true; out[key].receive = v.receive === true; }
+    if (protectOwner && (key === "inventory" || key === "settings" || key === "audit")) out[key].read = true;
   }
   return out;
 }
@@ -47,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "my_status" || action === "change_password") {
       const { data: me, error: meError } = await admin.from("app_users")
-        .select("id,username,is_active,is_paralyzed,must_change_password,permissions")
+        .select("id,auth_user_id,username,hotel_code,is_active,is_paralyzed,must_change_password,permissions")
         .eq("auth_user_id", user.id).maybeSingle();
       if (meError) throw meError;
       if (!me) return respond({ error: "هذا الحساب غير مسجل ضمن مستخدمي المنظومة" }, 403);
@@ -77,7 +78,7 @@ Deno.serve(async (req: Request) => {
       const [orders, deliveries, users, activity, audit] = await Promise.all([
         admin.from("orders").select("id,kind,created_at,hotel,approved").order("created_at", { ascending: false }).limit(500),
         admin.from("deliveries").select("status,updated_at,hotel,error").order("updated_at", { ascending: false }).limit(500),
-        admin.from("app_users").select("id,username,display_name,is_active,is_paralyzed,created_at").order("created_at", { ascending: false }).limit(200),
+        admin.from("app_users").select("id,username,display_name,hotel_code,is_active,is_paralyzed,created_at").order("created_at", { ascending: false }).limit(200),
         admin.from("app_user_activity").select("created_at,actor_username,action,target_username,details").order("created_at", { ascending: false }).limit(40),
         admin.from("admin_audit_log").select("created_at,hotel_code,actor_email,operation,table_name,entity_id").order("created_at", { ascending: false }).limit(40),
       ]);
@@ -203,9 +204,9 @@ Deno.serve(async (req: Request) => {
       if (action === "dispatch_status") return respond({ configured: !!githubToken });
       if (!githubToken) return respond({ error: "no-token" }, 404);
 
-      const mode = String(body.mode || "send");
-      if (!["send", "test", "manual"].includes(mode)) return respond({ error: "Invalid dispatch mode" }, 400);
-      const gh = await fetch("https://api.github.com/repos/githup29333/store-system/actions/workflows/send.yml/dispatches", {
+      const mode = String(body.mode || "auto");
+      if (!["auto", "verify"].includes(mode)) return respond({ error: "Invalid dispatch mode" }, 400);
+      const gh = await fetch("https://api.github.com/repos/theoisdevss/store-system/actions/workflows/send.yml/dispatches", {
         method: "POST",
         headers: {
           Accept: "application/vnd.github+json",
@@ -224,7 +225,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "list") {
       const { data, error } = await admin.from("app_users")
-        .select("id,auth_user_id,username,display_name,email,is_active,is_paralyzed,permissions,must_change_password,created_at")
+        .select("id,auth_user_id,username,display_name,email,hotel_code,is_active,is_paralyzed,permissions,must_change_password,created_at")
         .order("created_at");
       if (error) throw error;
       const { data: logs, error: logError } = await admin.from("app_user_activity")
@@ -251,10 +252,10 @@ Deno.serve(async (req: Request) => {
       if (createError || !created.user) throw createError || new Error("Could not create auth user");
 
       const { data: row, error: insertError } = await admin.from("app_users").insert({
-        auth_user_id: created.user.id, username, display_name, email,
+        auth_user_id: created.user.id, username, display_name, email, hotel_code: "EBR",
         permissions: cleanPermissions(body.permissions), created_by: OWNER,
         is_active: true, is_paralyzed: false, must_change_password: true,
-      }).select("id,auth_user_id,username,display_name,email,is_active,is_paralyzed,permissions,must_change_password,created_at").single();
+      }).select("id,auth_user_id,username,display_name,email,hotel_code,is_active,is_paralyzed,permissions,must_change_password,created_at").single();
       if (insertError) {
         await admin.auth.admin.deleteUser(created.user.id);
         throw insertError;
@@ -270,16 +271,18 @@ Deno.serve(async (req: Request) => {
       const id = String(body.id || "");
       const { data: target, error: targetError } = await admin.from("app_users").select("*").eq("id", id).single();
       if (targetError || !target) return respond({ error: "المستخدم غير موجود" }, 404);
-      if (target.auth_user_id === OWNER || target.username === "theo") return respond({ error: "لا يمكن تعديل المالك الأعلى" }, 403);
+      const isOwnerTarget = target.auth_user_id === OWNER || target.username === "theo";
+      if (isOwnerTarget && action === "paralyze") return respond({ error: "حساب المالك محمي ولا يمكن إيقافه أو شلّه" }, 403);
       let patch: Record<string, unknown> = {};
       if (action === "paralyze") patch = { is_paralyzed: body.value === true };
       else {
         if (body.display_name !== undefined) patch.display_name = String(body.display_name).trim().slice(0, 80);
-        if (body.permissions !== undefined) patch.permissions = cleanPermissions(body.permissions);
-        if (body.is_active !== undefined) patch.is_active = body.is_active === true;
+        if (body.permissions !== undefined) patch.permissions = cleanPermissions(body.permissions, isOwnerTarget);
+        if (!isOwnerTarget && body.is_active !== undefined) patch.is_active = body.is_active === true;
+        if (isOwnerTarget) { patch.is_active = true; patch.is_paralyzed = false; }
       }
       const { data: updated, error } = await admin.from("app_users").update(patch).eq("id", id)
-        .select("id,auth_user_id,username,display_name,email,is_active,is_paralyzed,permissions,must_change_password,created_at").single();
+        .select("id,auth_user_id,username,display_name,email,hotel_code,is_active,is_paralyzed,permissions,must_change_password,created_at").single();
       if (error) throw error;
       await admin.from("app_user_activity").insert({
         app_user_id: id, actor_auth_user_id: OWNER, actor_username: "theo",
