@@ -579,7 +579,7 @@ function drawD(){
  const rec=RV().map(r=>`<tr><td>${esc(r.hotel||'')}</td><td><span class="tag ${r.kind==='to'?'t-ok':'t-w'}">${r.kind==='to'?'To':'CC'}</span></td><td>${esc(r.name||'')}</td><td dir="ltr">${esc(r.email)}</td><td><button class="btn bad" data-rd="${r.id}">حذف</button></td></tr>`).join('')||'<tr><td colspan="5">لا يوجد مستلمون</td></tr>';
  const rows=DV().map(d=>{const [lb,cl]=ST[d.status]||[d.status,''],age=(Date.now()-new Date(d.updated_at))/36e5,late=['pending','approved','sending','failed'].includes(d.status)&&age>6;
   const act=['pending','failed'].includes(d.status)?`<button class="btn" data-ap="${esc(d.key)}">موافقة وإرسال</button> <button class="btn alt" data-sk="${esc(d.key)}">تجاهل</button>`:'';
-  return `<tr><td>${['pending','failed'].includes(d.status)&&d.dept!=='ALL'?`<input type="checkbox" data-sel="${esc(d.key)}" ${DSEL.has(d.key)?'checked':''}>`:''}</td><td>${esc(d.hotel||'')}</td><td><b>${esc(d.no)}</b>${d.rev>1?' <small>(تحديث '+d.rev+')</small>':''}</td><td>${esc(d.dn||d.dept)}</td><td>${dt(d.ds)}</td><td><span class="tag ${cl}">${lb}</span>${late?' <b style="color:#b4231a">متأخر</b>':''}${d.error?'<br><small style="color:#b4231a">'+esc(d.error)+'</small>':''}</td><td>${act}</td></tr>`}).join('')||'<tr><td colspan="7">لا توجد نتائج للإرسال بعد</td></tr>';
+  return `<tr><td>${['pending','failed','approved'].includes(d.status)&&d.dept!=='ALL'?`<input type="checkbox" data-sel="${esc(d.key)}" ${DSEL.has(d.key)?'checked':''}>`:''}</td><td>${esc(d.hotel||'')}</td><td><b>${esc(d.no)}</b>${d.rev>1?' <small>(تحديث '+d.rev+')</small>':''}</td><td>${esc(d.dn||d.dept)}</td><td>${dt(d.ds)}</td><td><span class="tag ${cl}">${lb}</span>${late?' <b style="color:#b4231a">متأخر</b>':''}${d.error?'<br><small style="color:#b4231a">'+esc(d.error)+'</small>':''}</td><td>${act}</td></tr>`}).join('')||'<tr><td colspan="7">لا توجد نتائج للإرسال بعد</td></tr>';
  $('#d').innerHTML=`<h3>الإرسال التلقائي / AUTOMATIC SENDING</h3>
  <div class="row"><label><input type="checkbox" id="autoEnabled" ${AUTOCFG.enabled?'checked':''}> تفعيل الإرسال التلقائي للطلبات المكتملة</label>
  <label>وقت الإرسال اليومي <input type="time" id="autoTime" value="${esc(AUTOCFG.time||'15:00')}"></label>
@@ -626,7 +626,7 @@ async function approveOne(d){
 }
 const ordH=d=>{const o=ordFromCode(d.code),h=HOTELS.find(x=>x.code===d.hotel);o.hotelCode=d.hotel;o.hotelName=h?h.name:d.hotel;return o};
 const needTo=h=>REC.some(r=>r.active&&r.kind==='to'&&r.hotel===h);
-const picked=()=>[...DSEL].map(k=>DEL.find(x=>x.key===k)).filter(d=>d&&['pending','failed'].includes(d.status)&&d.dept!=='ALL');
+const picked=()=>[...DSEL].map(k=>DEL.find(x=>x.key===k)).filter(d=>d&&['pending','failed','approved'].includes(d.status)&&d.dept!=='ALL');
 async function approve(key){
  const d=DEL.find(x=>x.key===key);if(!d)return;
  if(!needTo(d.hotel))return alert('أضف مستلماً من نوع To لفندق '+d.hotel+' أولاً');
@@ -636,7 +636,7 @@ async function approve(key){
 async function bulkEach(){
  const L=picked();if(!L.length)return alert('حدّد طلباً واحداً على الأقل');
  const nt=[...new Set(L.map(d=>d.hotel))].filter(h=>!needTo(h));if(nt.length)return alert('أضف مستلماً من نوع To للفندق: '+nt.join(', '));
- try{await ensureAuth();for(const d of L)await approveOne(d);DSEL.clear();await load();alert('تمت الموافقة على '+L.length+' طلب (كل طلب بإيميل). '+GHMSG(await ghRun()))}
+ try{await ensureAuth();for(const d of L)if(['pending','failed'].includes(d.status))await approveOne(d);DSEL.clear();await load();alert('تم تجهيز '+L.length+' طلب للإرسال (كل طلب بإيميل). '+GHMSG(await ghRun('manual')))}
  catch(e){alert('تعذّر التنفيذ: '+e.message)}
 }
 async function xmulti(list){
