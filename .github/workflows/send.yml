@@ -6,12 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'auto = إرسال تلقائي حسب موعد الفندق | send = إرسال المعتمد | manual = تجهيز الطلبات المنتظرة | test = اختبار فقط'
+        description: 'auto = إرسال تلقائي بعد الموعد وتوقيع المستلم | test = اختبار اتصال البريد والمرفقات'
         type: choice
         options:
           - auto
-          - send
-          - manual
           - test
         default: 'auto'
 concurrency:
@@ -33,7 +31,7 @@ jobs:
       - run: npm test
       - run: node send.js
         env:
-          MODE: ${{ github.event_name == 'schedule' && 'auto' || github.event.inputs.mode || 'auto' }}
+          MODE: ${{ github.event.inputs.mode || 'auto' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
