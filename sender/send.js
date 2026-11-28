@@ -2,6 +2,7 @@
 // Scheduled runs use Africa/Tripoli time; manual dispatch remains available.
 const nodemailer = require('nodemailer');
 const { generateWorkbooks } = require('./workbooks');
+const { localParts, atOrAfter, signedOnly } = require('./automation');
 const E = process.env;
 const miss = ['SUPABASE_URL','SUPABASE_SERVICE_KEY','SMTP_HOST','SMTP_USER','SMTP_PASS'].filter(k=>!E[k]);
 if(miss.length){console.error('Missing env: '+miss.join(', '));process.exit(1);}
@@ -28,12 +29,6 @@ async function rest(path,opt={}){
 const REP={Prefer:'return=representation'};
 const addr=r=>({name:r.name||'',address:r.email});
 const uniq=a=>{const s=new Set();return a.filter(x=>{const k=x.address.toLowerCase();if(s.has(k))return false;s.add(k);return true;});};
-const localParts=(date=new Date(),tz='Africa/Tripoli')=>{
- const parts=new Intl.DateTimeFormat('en-GB',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(date);
- return Object.fromEntries(parts.map(x=>[x.type,x.value]));
-};
-const atOrAfter=(now,hhmm)=>{const [h,m]=String(hhmm||'15:00').split(':').map(Number);return now.hour>String(h).padStart(2,'0')||(now.hour===String(h).padStart(2,'0')&&now.minute>=String(m).padStart(2,'0'));};
-
 async function loadContext(){
  const [items,prices,links,hotels,hotelPriceOverrides]=await Promise.all([
   rest('items?select=id,ar,en&limit=5000'),
@@ -140,9 +135,9 @@ async function sendBatch(group, to, cc, hotelName, ctx){
  for(const r of receiptRows||[]){
   if(r.signature_png&&Array.isArray(r.items)&&!receiptMap.has(String(r.order_no)))receiptMap.set(String(r.order_no),r);
  }
- const waiting=group.filter(d=>!receiptMap.has(String(d.no)));
+ const {eligible,waiting}=signedOnly(group,receiptMap);
  if(waiting.length)console.log('Waiting for recipient signature; approved orders remain unsent: '+waiting.map(d=>d.no).join(', '));
- group=group.filter(d=>receiptMap.has(String(d.no)));
+ group=eligible;
  if(!group.length){console.log('No signed receipts available for '+hotelCode+'; nothing sent');return true;}
  const claimed=[];
  for(const d of group){
