@@ -1,5 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { localParts, atOrAfter, signedOnly, shouldRunAutomatic } = require('./automation');
 
 const before = new Date('2026-11-28T13:59:00.000Z'); // 15:59 Libya
@@ -20,4 +22,14 @@ const receipts = new Map([
 const result = signedOnly(orders,receipts);
 assert.deepEqual(result.eligible.map(x=>x.no),['A-1']);
 assert.deepEqual(result.waiting.map(x=>x.no),['A-2','A-3']);
-console.log('Automation tests passed: Libya 16:00 schedule gate, disabled gate, and mandatory named signatures.');
+const receiptPage = fs.readFileSync(path.join(__dirname, '..', 'receipt-confirm.html'), 'utf8');
+const receiptLog = fs.readFileSync(path.join(__dirname, '..', 'receipt-log.html'), 'utf8');
+assert.match(receiptPage, /id="recipientName"[^>]*required/);
+assert.match(receiptPage, /id="signature"[^>]*canvas/);
+assert.match(receiptPage, /pointerdown/);
+assert.match(receiptPage, /pointermove/);
+assert.match(receiptPage, /canvas\.toDataURL\("image\/png"\)/);
+assert.match(receiptPage, /signature:canvas\.toDataURL/);
+assert.match(receiptLog, /x\.recipient_name/);
+assert.match(receiptLog, /x\.signature_png/);
+console.log('Automation tests passed: Tripoli 16:00 schedule gate, mandatory named signatures, finger-drawn signature submission, and named signed-receipt log.');
