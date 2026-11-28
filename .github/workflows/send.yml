@@ -3,8 +3,6 @@ permissions:
   contents: read
 
 on:
-  schedule:
-    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       mode:
@@ -32,6 +30,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-audit --no-fund
+      - run: npm test
       - run: node send.js
         env:
           MODE: ${{ github.event_name == 'schedule' && 'auto' || github.event.inputs.mode || 'auto' }}
