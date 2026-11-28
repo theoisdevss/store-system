@@ -8,13 +8,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'send = إرسال الموافق عليه | manual = تشغيل كل الطلبات المنتظرة الآن | test = رسالة اختبار فقط'
+        description: 'auto = إرسال تلقائي حسب موعد الفندق | send = إرسال المعتمد | manual = تجهيز الطلبات المنتظرة | test = اختبار فقط'
         type: choice
         options:
+          - auto
           - send
           - manual
           - test
-        default: 'send'
+        default: 'auto'
 concurrency:
   group: send-issue-emails
   cancel-in-progress: false
