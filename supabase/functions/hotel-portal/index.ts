@@ -44,7 +44,7 @@ Deno.serve(async (req: Request) => {
         });
         const rawLines = String(fields[6] || "").split(",").filter(Boolean).map(line => {
           const p = line.split(":");
-          if (p.length < 4 || !/^\\d+$/.test(p[0])) return null;
+          if (p.length < 4 || !/^[0-9]+$/.test(p[0])) return null;
           return { id: Number(p[0]), requested: Number(p[1]), issued: Number(p[2]), unit: p[3] || "" };
         });
         if (!rawLines.length || rawLines.some(x => !x || !Number.isSafeInteger(x.id) ||
