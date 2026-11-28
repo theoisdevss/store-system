@@ -25,7 +25,7 @@ assert.deepEqual(result.waiting.map(x=>x.no),['A-2','A-3']);
 const receiptPage = fs.readFileSync(path.join(__dirname, '..', 'receipt-confirm.html'), 'utf8');
 const receiptLog = fs.readFileSync(path.join(__dirname, '..', 'receipt-log.html'), 'utf8');
 assert.match(receiptPage, /id="recipientName"[^>]*required/);
-assert.match(receiptPage, /id="signature"[^>]*canvas/);
+assert.match(receiptPage, /<canvas id="signature"/);
 assert.match(receiptPage, /pointerdown/);
 assert.match(receiptPage, /pointermove/);
 assert.match(receiptPage, /canvas\.toDataURL\("image\/png"\)/);
