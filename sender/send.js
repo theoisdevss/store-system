@@ -191,35 +191,14 @@ async function sendBatch(group, to, cc, hotelName, ctx){
  }
 }
 
-async function runTest(){
+async function verifySmtp(){
  await transport.verify();
- const to=E.TEST_TO||E.SMTP_USER,hotel=E.TEST_HOTEL||'EBR';
- const rows=await rest('deliveries?select=hotel,dept,no,ds,dn,file_path,cost_path&hotel=eq.'+enc(hotel)+'&status=eq.sent&file_path=not.is.null&cost_path=not.is.null&order=updated_at.desc&limit=1');
- if(!rows.length)throw new Error('No previously sent order with both Excel files found for test hotel '+hotel);
- const d=rows[0],paths=[d.file_path,d.cost_path];
- const files=await Promise.all(paths.map(p=>fetch(URL_+'/storage/v1/object/exports/'+enc(p),{headers:H})));
- if(files.some(r=>!r.ok))throw new Error('Could not download both existing test attachments');
- const bufs=await Promise.all(files.map(r=>r.arrayBuffer()));
- if(bufs.some(b=>b.byteLength<100||Buffer.from(b).subarray(0,2).toString()!=='PK'))throw new Error('Stored test workbook is invalid');
- await transport.sendMail({from:FROM,to,subject:'[TEST] مرفقات منظومة الصرف / Issuance attachments test — '+d.no,
-  text:'هذه رسالة اختبار فقط مع ملفّي Excel.\nThis is a test email with both Excel attachments.',
-  attachments:[
-   {filename:'Issue_'+d.dept+'_'+d.no+'.xlsx',content:Buffer.from(bufs[0]),contentType:XL},
-   {filename:'Cost_'+d.dept+'_'+d.no+'.xlsx',content:Buffer.from(bufs[1]),contentType:XL}
-  ]});
- const existing=await rest('app_secrets?select=value&key=eq.auto_send_config');
- let cfg={enabled:false,time:'15:00',timezone:'Africa/Tripoli'};
- try{if(existing[0]?.value)cfg={...cfg,...JSON.parse(existing[0].value)}}catch(e){}
- cfg.test_passed_at=new Date().toISOString();
- await rest('app_secrets?on_conflict=key',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({
-  key:'auto_send_config',value:JSON.stringify(cfg),updated_at:cfg.test_passed_at
- })});
- console.log('Test email sent to '+to+' with two verified Excel attachments; automatic activation is now unlocked.');
+ console.log('SMTP connection verified successfully; no email was sent.');
 }
 
 async function main(){
  const mode=E.MODE||'auto';
- if(mode==='test')return runTest();
+ if(mode==='verify')return verifySmtp();
  if(mode==='manual'||mode==='send')throw new Error('Manual email dispatch is disabled; automatic signed dispatch only.');
  // An interrupted SMTP transaction is ambiguous. Never auto-retry it and risk duplicates.
  const cutoff=new Date(Date.now()-15*60000).toISOString();
