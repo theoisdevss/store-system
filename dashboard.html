@@ -678,7 +678,7 @@ $('#d').onclick=async e=>{
   if(b.id==='dsEach')return bulkEach();
   if(b.id==='gsave'){const v=$('#gtok').value.trim();if(!v)return;await ownerAction('set_dispatch_token',null,v);$('#gtok').value='';GH_CONFIGURED=true;drawD();return alert('تم حفظ المفتاح بأمان على الخادم')}
   if(b.id==='gdel'){await ownerAction('delete_dispatch_token');GH_CONFIGURED=false;drawD();return}
-  if(b.id==='gtest'){if(!confirm('سيتم إرسال رسالة اختبار واحدة فقط إلى عنوان الاختبار المحدد في إعدادات GitHub، ولن يتم إرسال الطلبات المنتظرة. متابعة؟'))return;const g=await ghRun('test');return alert(g==='ok'?'تم تشغيل اختبار البريد. تحقق من صندوق الاختبار وسجل GitHub.':g==='no-token'?'أضف مفتاح GitHub أولاً':'تعذّر تشغيل الاختبار ('+g+')')}
+  if(b.id==='gtest'){const g=await ghRun('verify');return alert(g==='ok'?'تم طلب فحص اتصال البريد. لن تُرسل أي رسالة. راجع سجل التشغيل للتأكد من نجاح الاتصال.':g==='no-token'?'أضف مفتاح GitHub أولاً':'تعذّر تشغيل الفحص ('+g+')')}
   
   if(b.id==='autoSave'){
    const enabled=$('#autoEnabled').checked,time=$('#autoTime').value||'15:00';
