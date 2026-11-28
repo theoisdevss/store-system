@@ -220,6 +220,7 @@ async function runTest(){
 async function main(){
  const mode=E.MODE||'auto';
  if(mode==='test')return runTest();
+ if(mode==='manual'||mode==='send')throw new Error('Manual email dispatch is disabled; automatic signed dispatch only.');
  // An interrupted SMTP transaction is ambiguous. Never auto-retry it and risk duplicates.
  const cutoff=new Date(Date.now()-15*60000).toISOString();
  const stuck=await rest('deliveries?status=eq.sending&updated_at=lt.'+enc(cutoff),{
