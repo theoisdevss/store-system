@@ -10,7 +10,7 @@ on:
         type: choice
         options:
           - auto
-          - test
+          - verify
         default: 'auto'
 concurrency:
   group: send-issue-emails
